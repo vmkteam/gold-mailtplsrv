@@ -3,8 +3,8 @@ package renderer
 import (
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"net/http"
-	"os"
 	"sort"
 	"strings"
 
@@ -15,8 +15,9 @@ func fixturePath(fixture string) string {
 	return "tmpl/fixture/" + fixture + ".json"
 }
 
-func fixtureExists(fixture string) bool {
-	_, err := os.Stat(fixturePath(fixture))
+// fixtureExists looks the fixture up where the templates are: in embed mode a container has no tmpl/ on disk.
+func (r *Renderer) fixtureExists(fixture string) bool {
+	_, err := fs.Stat(r.fsys(), fixturePath(fixture))
 	return err == nil
 }
 
@@ -28,12 +29,12 @@ func (r *Renderer) EchoTestTemplate(c echo.Context) error {
 
 	templateName := c.Param("path")
 	fixture := c.QueryParam("fixture")
-	hasDefaultFixture := fixtureExists(templateName)
+	hasDefaultFixture := r.fixtureExists(templateName)
 
 	// set default fixture or from param
 	if fixture != "" {
 		// check for existance
-		if !fixtureExists(fixture) {
+		if !r.fixtureExists(fixture) {
 			return echo.NewHTTPError(http.StatusNotFound, "fixture not found")
 		}
 	} else if hasDefaultFixture {
@@ -42,7 +43,7 @@ func (r *Renderer) EchoTestTemplate(c echo.Context) error {
 
 	// parse fixture
 	if fixture != "" {
-		f, err := os.ReadFile(fixturePath(fixture))
+		f, err := fs.ReadFile(r.fsys(), fixturePath(fixture))
 		if err != nil {
 			return fmt.Errorf("read fixture failed: %w", err)
 		}
